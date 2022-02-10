@@ -2,3 +2,4 @@
 *.bin
 *.yal
 __pychache__/
+.vscode/
