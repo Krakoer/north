@@ -8,7 +8,8 @@ class Ops(Enum):
     DUMP=auto()
     MINUS = auto()
     EQUAL = auto()
-    
+    IF = auto()
+    END = auto()
 
 def push(x):
     return (Ops.PUSH, x)
@@ -25,10 +26,18 @@ def minus():
 def equal():
     return (Ops.EQUAL, )
 
+def iff():
+    return (Ops.IF, )
+
+def end():
+    return (Ops.END, )
+
 def simulate(prg):
     stack = []
-    for op in prg:
-        assert len(Ops) == 5, "Exhaustive handling of operations in simu"
+    ip = 0
+    while ip < len(prg):
+        assert len(Ops) == 7, "Exhaustive handling of operations in simu"
+        op = prg[ip]
         if op[0] == Ops.PLUS:
             a = stack.pop()
             b = stack.pop()
@@ -46,12 +55,26 @@ def simulate(prg):
             a = stack.pop()
             b = stack.pop()
             stack.append(int(a == b))
+
+        elif op[0] == Ops.IF:
+            a = stack.pop()
+            if a == 0:
+                assert len(op) >= 2, "Missing matching end for if"
+                ip = op[1]
+
+        elif op[0] == Ops.END:
+            pass
         else:
             raise Exception("Unreachable: unknown operand")
+        ip+=1
 
 def compile_prg(prg):
     with open("output.s", "w") as out:
         out.write("\t.org $8000\n")
+        out.write("\tinclude \"io.s\"\n")
+        out.write("\tinclude \"stack.s\"\n")
+        out.write("\tinclude \"maths.s\"\n")
+        out.write("\tinclude \"str.s\"\n")
         out.write("init:                                           ; boot routine, first thing loaded\n")
         out.write("\tldx #$ff                                    ; initialize the stackpointer with 0xff\n")
         out.write("\ttxs\n")
@@ -62,7 +85,7 @@ def compile_prg(prg):
 
         ##  COMPILATION
 
-        for op in prg:
+        for ip, op in enumerate(prg):
             # PUSH
             if op[0] == Ops.PUSH:
                 out.write(f"\t ; -- PUSH {op[1 ]} -- \n")
@@ -83,21 +106,33 @@ def compile_prg(prg):
 
             elif op[0] == Ops.DUMP:
                 out.write("\t ; -- DUMP -- \n")
+                out.write("\tjsr LCD__clear_video_ram\n")
                 out.write("\tjsr DUMP\n")
 
             elif op[0] == Ops.EQUAL:
                 out.write("\t ; -- EQUAL -- \n")
                 out.write("\tjsr EQ\n")
 
+            elif op[0] == Ops.IF:
+                out.write("\t ; -- IF -- \n")
+                
+                out.write("\tlda 0, x\n")
+                out.write("\tora 1, x\n")
+                out.write("\tphp\n")
+                out.write("\tPOP\n")
+                out.write("\tplp\n")
+
+                assert len(op) >= 2, "Missing end for if statement in compilation"
+                out.write(f"\tbeq addr_{op[1]}\n")
+
+            elif op[0] == Ops.END:
+                out.write("\t ; -- END --\n")
+                out.write(f"addr_{ip}:\n")
                 
 
 
         out.write("loop:\n")
         out.write("\tjmp loop\n\n")
-        out.write("\tinclude \"io.s\"\n")
-        out.write("\tinclude \"stack.s\"\n")
-        out.write("\tinclude \"maths.s\"\n")
-        out.write("\tinclude \"str.s\"\n")
         out.write("\t.org $fffc\n")
         out.write("\tword init\n")
         out.write("\tword $0000\n")
@@ -105,7 +140,7 @@ def compile_prg(prg):
 def parse_token(token: list):
     (file_path, row, col, word) = token
 
-    assert len(Ops) == 5, "Exhaustive handling of operations in parsing"
+    assert len(Ops) == 7, "Exhaustive handling of operations in parsing"
     
     if word.isdigit():
         return push(int(word))
@@ -117,13 +152,31 @@ def parse_token(token: list):
         return dump()
     elif word == "=":
         return equal()
+    elif word == "if":
+        return iff()
+    elif word == "end":
+        return end()
     else:
         raise Exception(f"Invalid token in \"{file_path}\", line {row+1}:{col+1}: {word}")
         exit(1)
 
+def cross_reference_blocks(prg):
+    stack = []
+    for ip, op in enumerate(prg):
+        assert len(Ops) == 7, "Asserted Ops count in cross reference"
+        if op[0] == Ops.IF:
+            stack.append(ip)
+        elif op[0] == Ops.END:
+            if stack:
+                if_ip = stack.pop()
+                prg[if_ip] = (Ops.IF, ip)
+    return prg
+
 def lex_file(path):
     with open(path, 'r') as f:
-        return [(path, row, col, token) for (row, line) in enumerate(f.readlines()) for (col, token) in lex_line(line)]
+        for (row, line) in enumerate(f.readlines()):
+            for (col, token) in lex_line(line):
+                yield (path, row, col, token)
 
 def find_predicate(line, start, predicate):
     while start < len(line) and not predicate(line[start]):
@@ -149,7 +202,7 @@ def load_prg_from_file(path):
     prg = []
     for t in tokens:
         prg.append(parse_token(t))
-    return prg
+    return cross_reference_blocks(prg)
 
 def print_help():
     print(f"Usage : {sys.argv[0]} <SUBCOMMAND> [ARGS]")
