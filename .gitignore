@@ -1,3 +1,4 @@
 *.s
 *.bin
 *.yal
+__pychache__/

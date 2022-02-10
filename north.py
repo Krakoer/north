@@ -10,6 +10,7 @@ class Ops(Enum):
     EQUAL = auto()
     IF = auto()
     END = auto()
+    ELSE = auto()
 
 def push(x):
     return (Ops.PUSH, x)
@@ -29,6 +30,9 @@ def equal():
 def iff():
     return (Ops.IF, )
 
+def elze():
+    return (Ops.ELSE, )
+
 def end():
     return (Ops.END, )
 
@@ -36,7 +40,7 @@ def simulate(prg):
     stack = []
     ip = 0
     while ip < len(prg):
-        assert len(Ops) == 7, "Exhaustive handling of operations in simu"
+        assert len(Ops) == 8, "Exhaustive handling of operations in simu"
         op = prg[ip]
         if op[0] == Ops.PLUS:
             a = stack.pop()
@@ -61,6 +65,10 @@ def simulate(prg):
             if a == 0:
                 assert len(op) >= 2, "Missing matching end for if"
                 ip = op[1]
+
+        elif op[0] == Ops.ELSE:
+            assert len(op) >= 2, "Else instruction not linked to end"
+            ip = op[1]
 
         elif op[0] == Ops.END:
             pass
@@ -124,6 +132,11 @@ def compile_prg(prg):
 
                 assert len(op) >= 2, "Missing end for if statement in compilation"
                 out.write(f"\tbeq addr_{op[1]}\n")
+            
+            elif op[0] == Ops.ELSE:
+                out.write("\t ; -- ELSE -- \n")
+                out.write(f"\tjmp addr_{op[1]}\n")
+                out.write(f"addr_{ip}")
 
             elif op[0] == Ops.END:
                 out.write("\t ; -- END --\n")
@@ -140,7 +153,7 @@ def compile_prg(prg):
 def parse_token(token: list):
     (file_path, row, col, word) = token
 
-    assert len(Ops) == 7, "Exhaustive handling of operations in parsing"
+    assert len(Ops) == 8, "Exhaustive handling of operations in parsing"
     
     if word.isdigit():
         return push(int(word))
@@ -156,6 +169,8 @@ def parse_token(token: list):
         return iff()
     elif word == "end":
         return end()
+    elif word == "else":
+        return elze()
     else:
         raise Exception(f"Invalid token in \"{file_path}\", line {row+1}:{col+1}: {word}")
         exit(1)
@@ -163,13 +178,23 @@ def parse_token(token: list):
 def cross_reference_blocks(prg):
     stack = []
     for ip, op in enumerate(prg):
-        assert len(Ops) == 7, "Asserted Ops count in cross reference"
+        assert len(Ops) == 8, "Asserted Ops count in cross reference"
         if op[0] == Ops.IF:
             stack.append(ip)
-        elif op[0] == Ops.END:
+        elif op[0] == Ops.ELSE:
             if stack:
                 if_ip = stack.pop()
-                prg[if_ip] = (Ops.IF, ip)
+                assert prg[if_ip][0] == Ops.IF, "Else used without if statement"
+                prg[if_ip] = (Ops.IF, ip) # Say if to jump just after the else instruction
+                stack.append(ip)
+        elif op[0] == Ops.END:
+            if stack:
+                block_ip = stack.pop()
+                block = prg[block_ip][0]
+                if block == Ops.IF or block == Ops.ELSE:
+                    prg[block_ip] = (block, ip)
+                else:
+                    raise Exception("Not implemented")
     return prg
 
 def lex_file(path):
