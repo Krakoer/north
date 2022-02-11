@@ -11,6 +11,11 @@ class Ops(Enum):
     IF = auto()
     END = auto()
     ELSE = auto()
+    GT = auto()
+    LT = auto()
+    DUP = auto()
+    # WHILE = auto()
+    # DO = auto()
 
 def push(x):
     return (Ops.PUSH, x)
@@ -36,11 +41,20 @@ def elze():
 def end():
     return (Ops.END, )
 
+def greater():
+    return (Ops.GT, )
+
+def less():
+    return (Ops.LT, )
+
+def dup():
+    return (Ops.DUP, )
+
 def simulate(prg):
     stack = []
     ip = 0
     while ip < len(prg):
-        assert len(Ops) == 8, "Exhaustive handling of operations in simu"
+        assert len(Ops) == 11, "Exhaustive handling of operations in simu"
         op = prg[ip]
         if op[0] == Ops.PLUS:
             a = stack.pop()
@@ -72,11 +86,28 @@ def simulate(prg):
 
         elif op[0] == Ops.END:
             pass
+
+        elif op[0] == Ops.DUP:
+            a = stack.pop()
+            stack.append(a)
+            stack.append(a)
+
+        elif op[0] == Ops.GT:
+            a = stack.pop()
+            b = stack.pop()
+            stack.append(int(a < b))
+
+        elif op[0] == Ops.LT:
+            a = stack.pop()
+            b = stack.pop()
+            stack.append(int(a > b))
+
         else:
             raise Exception("Unreachable: unknown operand")
         ip+=1
 
 def compile_prg(prg):
+    assert len(Ops) == 11, "Exhaustive handling of operations in comp"
     with open("output.s", "w") as out:
         out.write("\t.org $8000\n")
         out.write("\tinclude \"io.s\"\n")
@@ -141,7 +172,18 @@ def compile_prg(prg):
             elif op[0] == Ops.END:
                 out.write("\t ; -- END --\n")
                 out.write(f"addr_{ip}:\n")
+
+            elif op[0] == Ops.DUP:
+                out.write("\t ; -- DUP -- \n")
+                out.write("\tjsr DUP\n")
                 
+            elif op[0] == Ops.GT:
+                out.write("\t ; -- GREATER -- \n")
+                out.write("\tjsr GT\n")
+
+            elif op[0] == Ops.LT:
+                out.write("\t ; -- LESS -- \n")
+                out.write("\tjsr LT\n")
 
 
         out.write("loop:\n")
@@ -153,7 +195,7 @@ def compile_prg(prg):
 def parse_token(token: list):
     (file_path, row, col, word) = token
 
-    assert len(Ops) == 8, "Exhaustive handling of operations in parsing"
+    assert len(Ops) == 11, "Exhaustive handling of operations in parsing"
     
     if word.isdigit():
         return push(int(word))
@@ -171,6 +213,12 @@ def parse_token(token: list):
         return end()
     elif word == "else":
         return elze()
+    elif word == "dup":
+        return dup()
+    elif word == ">":
+        return greater()
+    elif word == "<":
+        return less()
     else:
         raise Exception(f"Invalid token in \"{file_path}\", line {row+1}:{col+1}: {word}")
         exit(1)
@@ -178,7 +226,7 @@ def parse_token(token: list):
 def cross_reference_blocks(prg):
     stack = []
     for ip, op in enumerate(prg):
-        assert len(Ops) == 8, "Asserted Ops count in cross reference"
+        assert len(Ops) == 11, "Asserted Ops count in cross reference"
         if op[0] == Ops.IF:
             stack.append(ip)
         elif op[0] == Ops.ELSE:
