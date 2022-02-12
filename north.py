@@ -119,6 +119,10 @@ def simulate(prg):
             raise Exception("Unreachable: unknown operand")
         ip+=1
 
+    # Stack non empty warning
+    if stack:
+        print(f"WARNING : Program finished with {len(stack)} elements on the stack")
+
 def compile_prg(prg):
     assert len(Ops) == 13, "Exhaustive handling of operations in comp"
     with open("output.s", "w") as out:
