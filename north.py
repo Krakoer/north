@@ -14,8 +14,8 @@ class Ops(Enum):
     GT = auto()
     LT = auto()
     DUP = auto()
-    # WHILE = auto()
-    # DO = auto()
+    WHILE = auto()
+    DO = auto()
 
 def push(x):
     return (Ops.PUSH, x)
@@ -50,11 +50,17 @@ def less():
 def dup():
     return (Ops.DUP, )
 
+def wile():
+    return (Ops.WHILE, )
+
+def do():
+    return (Ops.DO, )
+
 def simulate(prg):
     stack = []
     ip = 0
     while ip < len(prg):
-        assert len(Ops) == 11, "Exhaustive handling of operations in simu"
+        assert len(Ops) == 13, "Exhaustive handling of operations in simu"
         op = prg[ip]
         if op[0] == Ops.PLUS:
             a = stack.pop()
@@ -85,7 +91,8 @@ def simulate(prg):
             ip = op[1]
 
         elif op[0] == Ops.END:
-            pass
+            assert len(op) >= 2
+            ip = op[1]
 
         elif op[0] == Ops.DUP:
             a = stack.pop()
@@ -102,12 +109,18 @@ def simulate(prg):
             b = stack.pop()
             stack.append(int(a > b))
 
+        elif op[0] == Ops.DO:
+            a = stack.pop()
+            if not a:
+                ip = op[1]
+        elif op[0] == Ops.WHILE:
+            pass
         else:
             raise Exception("Unreachable: unknown operand")
         ip+=1
 
 def compile_prg(prg):
-    assert len(Ops) == 11, "Exhaustive handling of operations in comp"
+    assert len(Ops) == 13, "Exhaustive handling of operations in comp"
     with open("output.s", "w") as out:
         out.write("\t.org $8000\n")
         out.write("\tinclude \"io.s\"\n")
@@ -171,6 +184,7 @@ def compile_prg(prg):
 
             elif op[0] == Ops.END:
                 out.write("\t ; -- END --\n")
+                out.write(f"\tjmp addr_{op[1]}\n")
                 out.write(f"addr_{ip}:\n")
 
             elif op[0] == Ops.DUP:
@@ -185,6 +199,19 @@ def compile_prg(prg):
                 out.write("\t ; -- LESS -- \n")
                 out.write("\tjsr LT\n")
 
+            elif op[0] == Ops.WHILE:
+                out.write("\t ; -- WHILE -- \n")
+                out.write(f"addr_{ip}:\n")
+            elif op[0] == Ops.DO:
+                out.write("\t ; -- DO -- \n")
+                out.write("\tlda 1, x\n")
+                out.write("\tora 0, x\n")
+                out.write("\tphp\n")
+                out.write("\tPOP\n")
+                out.write("\tplp\n")
+                out.write(f"\tbeq addr_{op[1]}\n")
+        
+
 
         out.write("loop:\n")
         out.write("\tjmp loop\n\n")
@@ -195,7 +222,7 @@ def compile_prg(prg):
 def parse_token(token: list):
     (file_path, row, col, word) = token
 
-    assert len(Ops) == 11, "Exhaustive handling of operations in parsing"
+    assert len(Ops) == 13, "Exhaustive handling of operations in parsing"
     
     if word.isdigit():
         return push(int(word))
@@ -219,6 +246,10 @@ def parse_token(token: list):
         return greater()
     elif word == "<":
         return less()
+    elif word == "while":
+        return wile()
+    elif word == "do":
+        return do()
     else:
         raise Exception(f"Invalid token in \"{file_path}\", line {row+1}:{col+1}: {word}")
         exit(1)
@@ -226,7 +257,7 @@ def parse_token(token: list):
 def cross_reference_blocks(prg):
     stack = []
     for ip, op in enumerate(prg):
-        assert len(Ops) == 11, "Asserted Ops count in cross reference"
+        assert len(Ops) == 13, "Asserted Ops count in cross reference"
         if op[0] == Ops.IF:
             stack.append(ip)
         elif op[0] == Ops.ELSE:
@@ -241,8 +272,18 @@ def cross_reference_blocks(prg):
                 block = prg[block_ip][0]
                 if block == Ops.IF or block == Ops.ELSE:
                     prg[block_ip] = (block, ip)
+                    prg[ip] = (op[0], ip)
+                elif block == Ops.DO:
+                    while_ip = stack.pop()
+                    prg[block_ip] = (block, ip)
+                    prg[ip] = (op[0], while_ip)
                 else:
                     raise Exception("Not implemented")
+        elif op[0] == Ops.WHILE:
+            stack.append(ip)
+        elif op[0] == Ops.DO:
+            stack.append(ip)
+
     return prg
 
 def lex_file(path):

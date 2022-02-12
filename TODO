@@ -1,0 +1,1 @@
+[x] Create optimisation levels : 0 = actual, 1 = replace "jsr [SUB]" by sub code, 2 = ?
