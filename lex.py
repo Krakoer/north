@@ -4,7 +4,7 @@ from ops import *
 def parse_token(token: list):
     (file_path, row, col, word) = token
     loc = (file_path, row+1, col+1)
-    assert len(Ops) == 14, "Exhaustive handling of operations in parsing"
+    assert len(Ops) == 13, "Exhaustive handling of operations in parsing"
     
     if word.isdigit():
         return {"type": push(), "value": int(word), "loc":loc}
@@ -12,7 +12,7 @@ def parse_token(token: list):
         return {"type": plus(), "loc":loc}
     elif word == "-":
         return {"type": minus(), "loc":loc}
-    elif word == ".":
+    elif word == "dump":
         return {"type": dump(), "loc":loc}
     elif word == "=":
         return {"type": equal(), "loc":loc}
@@ -41,7 +41,7 @@ def parse_token(token: list):
 def cross_reference_blocks(prg):
     stack = []
     for ip, op in enumerate(prg):
-        assert len(Ops) == 14, "Asserted Ops count in cross reference"
+        assert len(Ops) == 13, "Asserted Ops count in cross reference"
         if op["type"] == Ops.IF:
             stack.append(ip)
         elif op["type"] == Ops.ELSE:
