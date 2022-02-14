@@ -3,3 +3,4 @@
 *.yal
 __pycache__/
 .vscode/
+*.sh

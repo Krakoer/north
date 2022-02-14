@@ -33,11 +33,11 @@ if __name__ == "__main__":
         simulate(prg)
     elif subcommand == "com":
         compile_prg(prg)
-        call_cmd(["vasm", "output.s",  "-c02", "-Fbin", "-dotdir", "-chklabels", "-o", "rom.bin"])
+        call_cmd(["vasm", "output.s",  "-wdc02", "-Fbin", "-dotdir", "-chklabels", "-o", "rom.bin"])
     elif subcommand == "up":
         compile_prg(prg)
-        call_cmd(["vasm", "output.s",  "-c02", "-Fbin", "-dotdir", "-chklabels"])
-        call_cmd(["minipro", "-p", "AT28C256", "-w", "a.out"])
+        call_cmd(["vasm", "output.s",  "-wdc02", "-Fbin", "-dotdir", "-chklabels", "-o", "rom.bin"])
+        call_cmd(["minipro", "-p", "AT28C256", "-w", "rom.bin"])
     
     else:
         print("Unknown subcommand")

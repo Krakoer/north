@@ -15,7 +15,9 @@ class Ops(Enum):
     DUP = auto()
     WHILE = auto()
     DO = auto()
-    # MEM = auto()
+    MEM = auto()
+    LOAD = auto()
+    STORE = auto()
 
 def push():
     return Ops.PUSH
@@ -58,3 +60,9 @@ def do():
 
 def mem():
     return Ops.MEM
+
+def load():
+    return Ops.LOAD
+
+def store():
+    return Ops.STORE
